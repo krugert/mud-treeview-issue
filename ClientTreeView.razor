@@ -1,0 +1,97 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using MXAdmin.Frontend.Client.Components.Pages
+@using MXAdmin.Frontend.Client.Contracts.MXAdminApp.Services.Clients
+
+<PageTitle>Client List</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <MudPaper Class="pa-4 mb-4" Elevation="0" Width="300px">
+            <MudText Typo="Typo.h5" Class="font-weight-bold mb-2">
+                Clients
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-4">
+                Browse and select a client from the tree view below.
+            </MudText>
+
+            @if (Model is null)
+            {
+                <MudStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center" Style="min-height: 150px;">
+                    <MudProgressCircular Indeterminate />
+                    <MudText Class="mt-2">Loading clients...</MudText>
+                </MudStack>
+            }
+            else if (!Model.Any())
+            {
+                <MudText Color="Color.Secondary">
+                    No clients found.
+                </MudText>
+            }
+            else
+            {
+                <MudTreeView Hover="true" T="ClientTreeItem" Color="Color.Tertiary">
+                    <MudTreeViewItem Text="Clients" Expanded="true">
+                        @foreach (var client in Model)
+                        {
+                            <div @onclick="@(e => OpenClientContextMenu(e, client))" @oncontextmenu="@(e => OpenClientContextMenu(e, client))" @oncontextmenu:preventDefault @oncontextmenu:stopPropagation>
+                                <MudTreeViewItem T="ClientTreeItem"
+                                                 Value="@CreateClientItem(client)"
+                                                 OnClick="@(() => OnClientClick(client))"
+                                                 Text="@client.ClientName"
+                                                 Icon="@Icons.Material.Filled.Business">
+                                    @if (client.Sites?.Any() == true)
+                                    {
+                                        @foreach (var site in client.Sites)
+                                        {
+                                            <div @onclick="@(e => OpenSiteContextMenu(e, site))" @oncontextmenu="@(e => OpenSiteContextMenu(e, site))" @oncontextmenu:preventDefault @oncontextmenu:stopPropagation>
+                                                <MudTreeViewItem T="ClientTreeItem"
+                                                                 Value="@CreateSiteItem(site, client.ClientId)"
+                                                                 OnClick="@(() => OnSiteClick(client, site.SiteId))"
+                                                                 Text="@site.SiteName"
+                                                                 Icon="@Icons.Material.Filled.LocationOn">
+                                                    @if (site.Divisions?.Any() == true)
+                                                    {
+                                                        @foreach (var division in site.Divisions)
+                                                        {
+                                                            <div @onclick="@(e => OpenDivisionContextMenu(e, division))" @oncontextmenu="@(e => OpenDivisionContextMenu(e, division))" @oncontextmenu:preventDefault @oncontextmenu:stopPropagation>
+                                                                <MudTreeViewItem T="ClientTreeItem"
+                                                                                 Value="@CreateDivisionItem(division, client.ClientId, site.SiteId)"
+                                                                                 OnClick="@(() => OnDivisionClick(client, site.SiteId, division.DivisionId))"
+                                                                                 Text="@division.DivisionName"
+                                                                                 Icon="@Icons.Material.Filled.AccountTree"
+                                                                                 @oncontextmenu="@(e => OpenDivisionContextMenu(e, division))">
+                                                                </MudTreeViewItem>
+                                                            </div>
+                                                        }
+                                                    }
+                                                </MudTreeViewItem>
+                                            </div>
+                                        }
+                                    }
+                                </MudTreeViewItem>
+                            </div>
+                        }
+                    </MudTreeViewItem>
+                </MudTreeView>
+            }
+            <MudMenu PositionAtCursor @ref="_clientContextMenu">
+                <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="New Site" />
+                <MudMenuItem Icon="@Icons.Material.Filled.Delete" Label="@($"Delete {_selectedClient?.ClientName ?? "Client"}")" />
+            </MudMenu>
+
+            <MudMenu PositionAtCursor @ref="_siteContextMenu">
+                <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="New Division" />
+                <MudMenuItem Icon="@Icons.Material.Filled.Delete" Label="@($"Delete {_selectedSite?.SiteName ?? "Site"}")" />
+            </MudMenu>
+
+            <MudMenu PositionAtCursor @ref="_divisionContextMenu">
+                <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="New Functional Location" />
+                <MudMenuItem Icon="@Icons.Material.Filled.Delete" Label="@($"Delete {_selectedDivision?.DivisionName ?? "Division"}")" />
+            </MudMenu>
+        </MudPaper>
+
+    </Authorized>
+    <NotAuthorized>
+        <p>You are not authenticated.</p>
+        @* <RedirectToLogin /> *@
+    </NotAuthorized>
+</AuthorizeView>
