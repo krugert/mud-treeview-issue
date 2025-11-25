@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Intent.RoslynWeaver.Attributes;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -6,10 +9,6 @@ using Microsoft.AspNetCore.WebUtilities;
 using MudBlazor;
 using MXAdmin.Frontend.Client.Components.Pages.Clients;
 using MXAdmin.Frontend.Client.Contracts.MXAdminApp.Services.Clients;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using static MudBlazor.Colors;
 
 [assembly: DefaultIntentManaged(Mode.Merge)]
@@ -20,8 +19,6 @@ namespace MXAdmin.Frontend.Client.Components
     public partial class ClientTreeView : ComponentBase
     {
         [Parameter]
-        public EventCallback<ClientTreeItem> OnItemSelected { get; set; }
-        [Parameter]
         public int ClientIdParameter { get; set; }
         private int _previousClientIdParameter;
         [Inject]
@@ -29,6 +26,7 @@ namespace MXAdmin.Frontend.Client.Components
         [Inject] NavigationManager? NavManager { get; set; }
         public List<ClientDto>? ClientModel { get; set; }
         public List<ClientNavigationContextDto>? Model { get; set; }
+        public EventCallback<ClientDto> OnClick { get; set; }
         [Inject]
         public IClientsService ClientService { get; set; } = default!;
         [Inject]
@@ -39,30 +37,17 @@ namespace MXAdmin.Frontend.Client.Components
         [Inject]
         public ISnackbar Snackbar { get; set; } = default!;
 
-        private MudMenu _clientContextMenu = null!;
+        private MudMenu _contextMenu = null!;
         private MudMenu _siteContextMenu = null!;
-        private MudMenu _divisionContextMenu = null!;
 
-        private ClientNavigationContextDto? _selectedClient;
-        private ClientSiteNavigationContextDto? _selectedSite;
-        private ClientDivisionNavigationContextDto? _selectedDivision;
-
-        private async Task OpenClientContextMenu(MouseEventArgs e, ClientNavigationContextDto client)
+        private async Task OpenContextMenu(MouseEventArgs args)
         {
-            _selectedClient = client;
-            await _clientContextMenu.OpenMenuAsync(e);
+            await _contextMenu.OpenMenuAsync(args);
         }
 
-        private async Task OpenSiteContextMenu(MouseEventArgs e, ClientSiteNavigationContextDto site)
+        private async Task OpenSiteContextMenu(MouseEventArgs args)
         {
-            _selectedSite = site;
-            await _siteContextMenu.OpenMenuAsync(e);
-        }
-
-        private async Task OpenDivisionContextMenu(MouseEventArgs e, ClientDivisionNavigationContextDto division)
-        {
-            _selectedDivision = division;
-            await _divisionContextMenu.OpenMenuAsync(e);
+            await _siteContextMenu.OpenMenuAsync(args);
         }
 
         /// <summary>
@@ -79,31 +64,13 @@ namespace MXAdmin.Frontend.Client.Components
 
             var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-            // Snackbar.Add(state.User.Identity?.Name + " " + state.User.Identity?.IsAuthenticated, Severity.Info);
-
             if (state.User.Identity?.IsAuthenticated != true)
             {
-                // var returnUrl = "~/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-                // NavigationManager.NavigateTo($"/account/login", forceLoad: true);
                 return;
             }
-            // Snackbar.Add(state.User.Identity?.Name + " " + state.User.Identity?.IsAuthenticated, Severity.Info);
-
-            //foreach (var claim in state.User.Claims)
-            //{
-            //    Snackbar.Add($"{claim.Type}: {claim.Value}", Severity.Info);
-            //}
-
-            // AuthenticationStateProvider.
-
-            //if (string.IsNullOrEmpty(state.User.Identity?.Name))
-            //{
-            //    // var returnUrl = "~/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-            //    //NavigationManager.NavigateTo($"/account/login", forceLoad: true);
-            //    return;
-            //}
             await LoadUserNavigationContext();
         }
+
 
         private async Task LoadUserNavigationContext()
         {
@@ -118,15 +85,13 @@ namespace MXAdmin.Frontend.Client.Components
             }
         }
 
-        private async Task OnClientClick(ClientNavigationContextDto client)
+        private void OnClientClick(ClientNavigationContextDto client)
         {
+            // Check if the client exists
             if (client == null)
-            {
                 return;
-            }
-            var item = CreateClientItem(client);
 
-            await OnItemSelected.InvokeAsync(item);
+            EditClient(client.ClientId);
         }
 
         private void EditClient(int clientId)
@@ -159,22 +124,13 @@ namespace MXAdmin.Frontend.Client.Components
         }
         */
 
-        private async Task OnSiteClick(ClientNavigationContextDto client, int siteId)
+        private void OnSiteClick(ClientNavigationContextDto client, int siteId)
         {
+            // Optional: check if the site exists
             if (client == null)
-            {
                 return;
-            }
 
-            var site = client.Sites?.FirstOrDefault(s => s.SiteId == siteId);
-
-            if (site == null)
-            {
-                return;
-            }
-
-            // Pass clientId when creating the item
-            await OnItemSelected.InvokeAsync(CreateSiteItem(site, client.ClientId));
+            EditSite(client.ClientId, siteId);
         }
 
         private void EditSite(int clientId, int siteId)
@@ -183,22 +139,13 @@ namespace MXAdmin.Frontend.Client.Components
             NavigationManager.NavigateTo($"/clients/{clientId}/sites/{siteId}", forceLoad: true);
         }
 
-        private async Task OnDivisionClick(ClientNavigationContextDto client, int siteId, int divisionId)
+        private void OnDivisionClick(ClientNavigationContextDto client, int siteId, int divisionId)
         {
+            // Optional: check if the site exists
             if (client == null)
-            {
                 return;
-            }
 
-            var site = client.Sites?.FirstOrDefault(s => s.SiteId == siteId);
-            var division = site?.Divisions?.FirstOrDefault(d => d.DivisionId == divisionId);
-            if (division == null)
-            {
-                return;
-            }
-
-            // Pass both IDs when creating the item
-            await OnItemSelected.InvokeAsync(CreateDivisionItem(division, client.ClientId, siteId));
+            EditDivision(client.ClientId, siteId, divisionId);
         }
 
         private void EditDivision(int clientId, int siteId, int divisionId)
@@ -210,36 +157,17 @@ namespace MXAdmin.Frontend.Client.Components
 
         private ClientTreeItem CreateClientItem(ClientNavigationContextDto client)
         {
-            return new ClientTreeItem
-            {
-                Type = "Client",
-                Name = client.ClientName,
-                Id = client.ClientId,
-                ClientId = client.ClientId // Set for consistency
-            };
+            return new ClientTreeItem { Type = "Client", Name = client.ClientName, Id = client.ClientId };
         }
 
-        private ClientTreeItem CreateSiteItem(ClientSiteNavigationContextDto site, int clientId)
+        private ClientTreeItem CreateSiteItem(ClientSiteNavigationContextDto site)
         {
-            return new ClientTreeItem
-            {
-                Type = "Site",
-                Name = site.SiteName,
-                Id = site.SiteId,
-                ClientId = clientId
-            };
+            return new ClientTreeItem { Type = "Site", Name = site.SiteName, Id = site.SiteId };
         }
 
-        private ClientTreeItem CreateDivisionItem(ClientDivisionNavigationContextDto division, int clientId, int siteId)
+        private ClientTreeItem CreateDivisionItem(ClientDivisionNavigationContextDto division)
         {
-            return new ClientTreeItem
-            {
-                Type = "Division",
-                Name = division.DivisionName,
-                Id = division.DivisionId,
-                ClientId = clientId,
-                SiteId = siteId
-            };
+            return new ClientTreeItem { Type = "Division", Name = division.DivisionName, Id = division.DivisionId };
         }
     }
 
@@ -247,8 +175,6 @@ namespace MXAdmin.Frontend.Client.Components
     {
         public string Type { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
-        public int? Id { get; set; } // Primary ID (ClientId, SiteId, or DivisionId)
-        public int? ClientId { get; set; } // Set for Site and Division items
-        public int? SiteId { get; set; } // Set only for Division items
+        public int? Id { get; set; }
     }
 }
