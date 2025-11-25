@@ -1,2 +1,2 @@
 # mud-treeview-issue
-I'm having an issue where the division isn't displaying the context menu when right clicking on the Division treeview item in the list!
+Tree view context menu is very inconsistent! The context menu sometimes only displays after scrolling and sometimes doesn't seem to dispaly at all!
